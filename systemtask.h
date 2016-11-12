@@ -5,6 +5,7 @@
 #include <vector>
 #include <iostream>
 #include <cmath>
+#include <fstream>
 #include <algorithm>
 #include <functional>
 #include <iomanip>
@@ -12,6 +13,11 @@
 #include <random>
 
 #include "task.h"
+
+struct {
+    int min;
+    int max;
+} typedef Interval;
 
 class SystemTask
 {
@@ -46,6 +52,7 @@ private:
      * \return A random integer in the interval [min, max[
      */
     int random(int min, int max);
+
     std::random_device rd; // obtain a random number from hardware
 public:
 
@@ -69,7 +76,15 @@ public:
     SystemTask(int nbTask, double U);
 
     /*!
-     * \brief Get the utilisation factor in percent
+     * \brief Create a system according to a given set of tasks
+     * defined in a file.
+     * Note : I assume that the given file is correctly structured.
+     * \param pathFile Path to the file that describes the set of tasks.
+     */
+    SystemTask(char *pathFile);
+
+    /*!
+     * \brief Get the utilisation factor
      * @throws std::string If there is no task in the set
      * \return The utilisation factor
      */
@@ -90,6 +105,12 @@ public:
      * \return The period of the sytem.
      */
     int P();
+
+    /*!
+     * \brief Returns the feasible interval of the system.
+     * \return The feasible interval of the system.
+     */
+    Interval feasibleInterval();
 
     /*!
      * \brief Adds a task in the set
@@ -116,6 +137,7 @@ public:
      * \return a in std::string format
      */
     std::string intToStr(int a);
+    std::vector<Task> getTaskSet();
 };
 
 

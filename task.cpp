@@ -2,6 +2,8 @@
 
 Task::Task() : Task(0, 0, 0, 0) { }
 
+
+
 Task::Task(int O, int T, int D, int C)
 {
     if(D > T)

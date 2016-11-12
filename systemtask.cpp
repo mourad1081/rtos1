@@ -11,13 +11,13 @@ SystemTask::SystemTask(std::vector<Task> tasks)
 
 SystemTask::SystemTask(int nbTask, double U)
 {
-    if(U <= 0 || U > 100)
+    if(U <= 0)
         throw logic_error("error. U must be in the range (0, 100].");
 
     // We're generating an U close to the original U.
     // Not necessarily equals
     int Urand = random(U*0.95, U*1.05);
-    int gcd, T, multiplier = 1;
+    int T, multiplier = 1;
 
     // Critical case => nbTask > U
     while(nbTask > Urand*multiplier) {
@@ -35,13 +35,30 @@ SystemTask::SystemTask(int nbTask, double U)
 
     for(int i = 0; i < Urand; i++)
         this->taskSet[ random(0, nbTask-1) ].WCET++;
+}
 
+SystemTask::SystemTask(char *pathFile)
+{
+    string line;
+    ifstream file(pathFile);
+    int T, C, D, O;
 
-    for(int i = 0; i < nbTask; i++) {
-        gcd = GCD(taskSet[i].WCET, taskSet[i].period);
-        this->taskSet[i].WCET   /= gcd;
-        this->taskSet[i].period /= gcd;
-    }
+    if (file.is_open()) {
+        while (file >> O >> T >> D >> C) {
+            Task t(O, T, D, C);
+            addtask(t);
+        }
+
+    } else
+        cout << "Unable to open file";
+    file.close();
+
+    cout << toString();
+}
+
+std::vector<Task> SystemTask::getTaskSet()
+{
+    return taskSet;
 }
 
 int SystemTask::GCD(int a, int b)
@@ -101,6 +118,11 @@ int SystemTask::P()
         lcm = LCM(lcm, taskSet[i].period);
     }
     return lcm;
+}
+
+Interval SystemTask::feasibleInterval()
+{
+    return {0, Omax() + 2*P()};
 }
 
 void SystemTask::addtask(Task &t)
