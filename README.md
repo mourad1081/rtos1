@@ -7,6 +7,8 @@ Vous pouvez y retrouver par exemple :
   - **U()** qui retourne le facteur d'utilisation du CPU pour ce système.
   - **P()** qui retourne l'hyper-period. (Le fameux P que vous voyez dans les bornes)
   - **Omax()** qui retourne le plus grand offset
+  - **feasibleInterval()** qui retourne l'intervalle de faisabilité du système
+  - etc.
   
 Ensuite, vous trouverez le fichier main.cpp dans lequel a déjà été implémenté le module taskGenerator.
 Il reste encore à faire simDM et studyDM. 
