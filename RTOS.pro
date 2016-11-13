@@ -7,17 +7,16 @@ SOURCES += \
     main.cpp \
     systemtask.cpp \
     task.cpp \
-    job.cpp
+    job.cpp \
+    scheduler.cpp
 
 HEADERS += \
     systemtask.h \
     task.h \
-    job.h
+    job.h \
+    scheduler.h
 
 DISTFILES += \
-    simDM \
-    studyDM \
-    taskGenerator \
     makefile \
     README.md
 

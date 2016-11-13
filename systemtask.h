@@ -53,13 +53,15 @@ private:
      */
     int random(int min, int max);
 
+    /*!
+     * \brief Generate the minimal set of jobs for each tasks of the system.
+     *        The minimal set of jobs corresponds to tha maximum release of jobs
+     *        of a task during the feasible interval.
+     */
+    void createJobs();
+
     std::random_device rd; // obtain a random number from hardware
 public:
-
-    /*!
-     * \brief Create a system with an empty set of task
-     */
-    SystemTask();
 
     /*!
      * \brief create a system with given set of tasks
@@ -69,39 +71,36 @@ public:
 
     /*!
      * \brief Create a system with a random set of task
-     * according to the arguments.
+     *        according to the arguments.
      * \param nbTask The desired number of tasks
      * \param U The desired utilisation factor
      */
     SystemTask(int nbTask, double U);
 
     /*!
-     * \brief Create a system according to a given set of tasks
-     * defined in a file.
-     * Note : I assume that the given file is correctly structured.
+     * \brief Create a system according to a given set of tasks defined
+     *        in a file.
+     *        Note : I assume that the given file is correctly structured.
      * \param pathFile Path to the file that describes the set of tasks.
      */
     SystemTask(char *pathFile);
 
     /*!
      * \brief Get the utilisation factor
-     * @throws std::string If there is no task in the set
      * \return The utilisation factor
      */
     double U();
 
     /*!
      * \brief Get the maximal offset of the set of tasks
-     * @throws std::string If there is no task in the set
      * \return The maximal offset of the set of tasks
      */
     int Omax();
 
     /*!
-     * \brief Returns the period of the sytem.
-     * P is defined as LCM(to) where
-     * "to" is the set of task of this system.
-     * @throws std::string If there is no task in the set
+     * \brief Returns the hyper-period of the sytem.
+     *        P is defined as LCM(to) where
+     *        to is the set of task of this system.
      * \return The period of the sytem.
      */
     int P();
@@ -120,9 +119,9 @@ public:
 
     /*!
      * \brief Sorts the task set by deadline.
-     * (Smaller the deadline, hihger the index/priority)
+     *        (Smaller the deadline, hihger the priority, lower the index)
      */
-    void sortByDeadline();
+    void assignPriority();
 
     /*!
      * \brief Returns this object in a string format
@@ -132,12 +131,12 @@ public:
 
     /*!
      * \brief Since minGW has issue with std::to_string,
-     * I've made my own function to convert int's to strings.
+     *        I've made my own function to convert int's to strings.
      * \param a The value to convert
      * \return a in std::string format
      */
     std::string intToStr(int a);
-    std::vector<Task> getTaskSet();
+    std::vector<Task> &getTaskSet();
 };
 
 

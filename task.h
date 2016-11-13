@@ -16,6 +16,14 @@ class Task {
     int deadline;
     int offset;
     int WCET;
+
+    void addJob(Job &j);
+
+    /*!
+     * \brief Releases the last job in the queue
+     * \return The last job in the queue
+     */
+    Job &releaseJob();
 };
 
 #endif // TASK_H

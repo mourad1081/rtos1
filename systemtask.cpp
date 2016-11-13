@@ -2,11 +2,10 @@
 #include "systemtask.h"
 using namespace std;
 
-SystemTask::SystemTask() { }
-
 SystemTask::SystemTask(std::vector<Task> tasks)
 {
     this->taskSet = tasks;
+    createJobs();
 }
 
 SystemTask::SystemTask(int nbTask, double U)
@@ -35,6 +34,8 @@ SystemTask::SystemTask(int nbTask, double U)
 
     for(int i = 0; i < Urand; i++)
         this->taskSet[ random(0, nbTask-1) ].WCET++;
+
+    createJobs();
 }
 
 SystemTask::SystemTask(char *pathFile)
@@ -50,13 +51,13 @@ SystemTask::SystemTask(char *pathFile)
         }
 
     } else
-        cout << "Unable to open file";
-    file.close();
+        throw logic_error("Unable to open file");
 
-    cout << toString();
+    file.close();
+    createJobs();
 }
 
-std::vector<Task> SystemTask::getTaskSet()
+std::vector<Task> &SystemTask::getTaskSet()
 {
     return taskSet;
 }
@@ -82,6 +83,19 @@ int SystemTask::random(int min, int max)
     std::mt19937 eng(this->rd()); // seed the generator
     std::uniform_int_distribution<> distr(min, max); // define the range
     return distr(eng);
+}
+
+void SystemTask::createJobs()
+{
+    int maxInterval = feasibleInterval().max;
+    int nbJobs;
+    for(unsigned int i = 0; i < taskSet.size(); i++) {
+        nbJobs = (int) (maxInterval / (taskSet[i].offset + taskSet[i].period));
+        for(int j = 0; j <= nbJobs; j++) {
+            Job job(taskSet[i].offset, taskSet[i].WCET, taskSet[i].deadline);
+            taskSet[i].addJob(job);
+        }
+    }
 }
 
 double SystemTask::U()
@@ -122,7 +136,7 @@ int SystemTask::P()
 
 Interval SystemTask::feasibleInterval()
 {
-    return {0, Omax() + 2*P()};
+    return {Omax(), Omax() + 2*P()};
 }
 
 void SystemTask::addtask(Task &t)
@@ -130,13 +144,15 @@ void SystemTask::addtask(Task &t)
     this->taskSet.push_back(t);
 }
 
-void SystemTask::sortByDeadline()
+void SystemTask::assignPriority()
 {
     std::sort(taskSet.begin(), taskSet.end(), [](Task a, Task b)
     {
         return a.deadline < b.deadline;
     });
 }
+
+
 
 string SystemTask::toString()
 {

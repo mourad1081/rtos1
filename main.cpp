@@ -3,6 +3,7 @@
 #include <cstring>
 #include <fstream>
 #include "systemtask.h"
+#include "scheduler.h"
 
 using namespace std;
 
@@ -39,16 +40,6 @@ int simDM(int argc, char *argv[]);
 int studyDM(int argc, char *argv[]);
 
 /*!
- * \brief startPartitionnedAssignment
- */
-void startPartitionnedAssignment(char *pathFile, int nbProcessors);
-
-/*!
- * \brief startGlobalAssignment
- */
-void startGlobalAssignment(char *pathFile, int nbProcessors);
-
-/*!
  * \brief main Main function that produces all modules according to
  * the specified flag during compilation.
  * Compile with -DSIM_DM_MODULE to produce "simDM" module,
@@ -59,15 +50,27 @@ void startGlobalAssignment(char *pathFile, int nbProcessors);
  */
 int main(int argc, char *argv[]);
 
+static const string INVALID_ARGUMENT = "Error : not a valid argument";
+
+static const string ERROR_TASK_GENERATOR = "Error. Correct command must be : "
+                                           "taskGenerator -n NbTasks -u "
+                                           "UtilisationFactor -o file";
+
+static const string ERROR_SIM_DM = "Correct command must be : simDM "
+                                   "[-g | -p] <tasksFile> <processorsNbr>";
 // -------------------------------------------------------------------------- //
 
 int strToInt(char *c) {
     char *endPtr;
     int value = std::strtol(c, &endPtr, 10);
     if(endPtr == c)
-        throw std::invalid_argument("Error : not a valid argument");
+        throw std::invalid_argument(INVALID_ARGUMENT);
     return value;
 }
+
+
+
+
 
 // ======================== TASK GENERATOR MODULE =========================== //
 
@@ -77,8 +80,7 @@ int taskGenerator(int argc, char *argv[]) {
     char *outputFile;
 
     if(argc < 7) {
-        throw invalid_argument("Error. Correct command must be : taskGenerator "
-                               "-n NbTasks -u UtilisationFactor -o file");
+        throw invalid_argument(ERROR_TASK_GENERATOR);
     }
     else {
         for (int i = 1; i < argc; i++) {
@@ -101,6 +103,10 @@ int taskGenerator(int argc, char *argv[]) {
 }
 
 
+
+
+
+
 // ============================= SIM DM MODULE ============================== //
 
 int simDM(int argc, char *argv[]) {
@@ -109,31 +115,33 @@ int simDM(int argc, char *argv[]) {
     char *pathFile;
     int nbProcessors;
 
-    if(argc < 4) {
-        throw std::invalid_argument("Correct command must be : simDM "
-                                    "[-g | -p] <tasksFile> <processorsNbr>");
-    }
+    // Parsing arguments
+    if(argc < 4)
+        throw std::invalid_argument(ERROR_SIM_DM);
     else {
         global       = !strcmp(argv[1], "-g");
         partitionned = !strcmp(argv[1], "-p");
         if(partitionned == global)
-            throw std::invalid_argument("Correct command must be: simDM [-g | "
-                                        "-p] <tasksFile> <processorsNbr>");
+            throw std::invalid_argument(ERROR_SIM_DM);
         pathFile = argv[2];
         nbProcessors = strToInt(argv[3]);
     }
-    partitionned ? startPartitionnedAssignment(pathFile, nbProcessors) :
-                   startGlobalAssignment(pathFile, nbProcessors);
+
+    // Creation of the system tasks
+    SystemTask to(pathFile);
+    // Priority assignment
+    to.assignPriority();
+    // Simulation
+    Interval simInterval{0, to.feasibleInterval().max};
+    // TODO
+    Scheduler scheduler(to, nbProcessors);
+
+    partitionned ? scheduler.schedulePartitionned() :
+                   scheduler.scheduleGlobal();
+
     return 0;
 }
 
-void startPartitionnedAssignment(char * pathFile, int nbProcessors) {
-    SystemTask to(pathFile);
-}
-
-void startGlobalAssignment(char *pathFile, int nbProcessors) {
-
-}
 
 // ============================= STUDY DM MODULE ============================ //
 
@@ -155,7 +163,7 @@ int main(int argc, char *argv[])
     #elif defined STUDY_DM_MODULE
         return studyDM(argc, argv);
     #endif
-    return 0;
+    return -1;
 }
 // -------------------------------------------------------------------------- //
 
