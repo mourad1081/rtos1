@@ -129,11 +129,10 @@ int simDM(int argc, char *argv[]) {
 
     // Creation of the system tasks
     SystemTask to(pathFile);
+
     // Priority assignment
     to.assignPriority();
-    // Simulation
-    Interval simInterval{0, to.feasibleInterval().max};
-    // TODO
+
     Scheduler scheduler(to, nbProcessors);
 
     partitionned ? scheduler.schedulePartitionned() :
@@ -141,6 +140,11 @@ int simDM(int argc, char *argv[]) {
 
     return 0;
 }
+
+
+
+
+
 
 
 // ============================= STUDY DM MODULE ============================ //
@@ -152,10 +156,18 @@ int studyDM(int argc, char *argv[]) {
 
 
 
+
+
+
 // ================================= MAIN =================================== //
 
 int main(int argc, char *argv[])
 {
+    SystemTask to("out.txt");
+
+    char *args[] = {"simDM", "-g", "out.txt", "4"};
+    simDM(4, args);
+
     #if defined TASK_GENERATOR_MODULE
         return taskGenerator(argc, argv);
     #elif defined SIM_DM_MODULE

@@ -20,10 +20,16 @@ class Task {
     void addJob(Job &j);
 
     /*!
-     * \brief Releases the last job in the queue
-     * \return The last job in the queue
+     * \brief Releases the last job in the queue.
+     * \return The last job in the queue.
      */
     Job &releaseJob();
+
+    /*!
+     * \brief Returns the latest job in the queue without releasing (poping) it.
+     * \return The last job in the queue.
+     */
+    Job &nextJob();
 };
 
 #endif // TASK_H

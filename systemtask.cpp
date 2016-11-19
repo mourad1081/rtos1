@@ -24,6 +24,7 @@ SystemTask::SystemTask(int nbTask, double U)
     }
     Urand *= multiplier;
     T = 100*multiplier;
+
     // General case => nbTask < U
     // 1 -- Give 1 WCET to each task
     // 2 -- For i = (nbTask, nbTask+1, ..., U-1, U) :
@@ -92,7 +93,10 @@ void SystemTask::createJobs()
     for(unsigned int i = 0; i < taskSet.size(); i++) {
         nbJobs = (int) (maxInterval / (taskSet[i].offset + taskSet[i].period));
         for(int j = 0; j <= nbJobs; j++) {
-            Job job(taskSet[i].offset, taskSet[i].WCET, taskSet[i].deadline);
+            Job job(taskSet[i].offset + j*taskSet[i].period,
+                    taskSet[i].WCET,
+                    taskSet[i].deadline,
+                    taskSet[i].offset + j*taskSet[i].period + taskSet[i].deadline);
             taskSet[i].addJob(job);
         }
     }
@@ -118,6 +122,18 @@ int SystemTask::Omax()
     int Omax = taskSet[0].offset;
     for(unsigned int i = 1; i < this->taskSet.size(); i++) {
         Omax = (Omax < taskSet[i].offset) ? taskSet[i].offset : Omax;
+    }
+    return Omax;
+}
+
+int SystemTask::Omin()
+{
+    if(taskSet.empty())
+        throw std::length_error("error : no taks in the set");
+
+    int Omax = taskSet[0].offset;
+    for(unsigned int i = 1; i < this->taskSet.size(); i++) {
+        Omax = (Omax > taskSet[i].offset) ? taskSet[i].offset : Omax;
     }
     return Omax;
 }

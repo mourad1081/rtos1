@@ -97,6 +97,8 @@ public:
      */
     int Omax();
 
+    int Omin();
+
     /*!
      * \brief Returns the hyper-period of the sytem.
      *        P is defined as LCM(to) where

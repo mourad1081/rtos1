@@ -1,8 +1,28 @@
 #ifndef TIMELINE_H
 #define TIMELINE_H
 #include <map>
-#include <vector>
+#include <tuple>
 #include "systemtask.h"
+
+struct ScheduleLogs {
+    int nbIdleTotal;
+    // key : num processor, value : nb idle for that processor
+    std::map<int, int> nbIdlePerProcessor;
+    double utilisationTotal;
+    std::map<int, double> utilisationPerProcessor;
+    int nbPreemptionsTotal;
+    std::map<int, int> nbPreemptionsPerProcessor;
+    int nbRequiredProcessors;
+    int nbDesiredProcessors;
+    Interval studyInterval;
+    bool failed;
+};
+
+struct Assignment {
+    Job *assignedJob;
+    int numProcessor;
+    int slotTime;
+};
 
 class Scheduler
 {
@@ -11,19 +31,6 @@ class Scheduler
         int max;
         int nbProcessors;
 
-
-        /*!
-         * \brief Indicate all deadlines of a task in the interval [min, max]
-         *        To each task, we assign a list of deadlines
-         *        (their occurence in the timeline).
-         */
-        std::map<Task *, std::vector<int>> tasks_deadlines;
-
-        /**
-         * \brief Same as tasks_deadlines but for releases.
-         */
-        std::map<Task *, std::vector<int>> tasks_releases;
-
         /*!
          * \brief The system of tasks to schedule
          */
@@ -31,14 +38,8 @@ class Scheduler
 
         /*!
          * \brief To each slot of time, we assign a job to a processor.
-         *        -> First  : The assigned job
-         *        -> Second : The processor index
-         *        -> Third  : The slot number (time)
-         *        Example : the tuple (0x09332f, 4, 32) means
-         *                  the job 0x09332f is assigned to the fourth processor
-         *                  at time t = 32
          */
-        std::vector<std::tuple<Job *, int, int>> assignments;
+        std::vector<Assignment> assignments;
 
     public:
 
@@ -70,11 +71,26 @@ class Scheduler
          */
         void assignJob(Job *j, int startSlot, int indexProcessor);
 
-        void scheduleGlobal();
+        /*!
+         * \brief Returns the job on the desired processor at the desired slot
+         * \param slot The slot of time
+         * \param numProcessor Number of processor
+         * \return The assigned job
+         */
+        Job *jobAt(int slot, int numProcessor);
 
-        void schedulePartitionned();
+        /*!
+         * \brief Assign a job to a processor and a slot of time
+         * \param numProcessor Number of the processor
+         * \param slot Slot of time
+         * \param job The job to assign
+         */
+        void assign(int numProcessor, int slot, Job *job);
 
-        void resetSchedule();
+        ScheduleLogs scheduleGlobal();
+
+        ScheduleLogs schedulePartitionned();
+
 };
 
 #endif // TIMELINE_H

@@ -26,3 +26,8 @@ Job &Task::releaseJob()
     jobs.pop();
     return j;
 }
+
+Job &Task::nextJob()
+{
+    return jobs.front();
+}
