@@ -92,12 +92,13 @@ void SystemTask::createJobs()
     int nbJobs;
     for(unsigned int i = 0; i < taskSet.size(); i++) {
         nbJobs = (int) (maxInterval / (taskSet[i].offset + taskSet[i].period));
-        for(int j = 0; j <= nbJobs; j++) {
+        for(int j = 0; j < nbJobs; j++) {
             Job job(taskSet[i].offset + j*taskSet[i].period,
                     taskSet[i].WCET,
                     taskSet[i].deadline,
                     taskSet[i].offset + j*taskSet[i].period + taskSet[i].deadline);
             taskSet[i].addJob(job);
+            job.parent = &taskSet[i];
         }
     }
 }

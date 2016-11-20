@@ -8,13 +8,22 @@ SOURCES += \
     systemtask.cpp \
     task.cpp \
     job.cpp \
-    scheduler.cpp
+    scheduler.cpp \
+    easyBMP/EasyBMP.cpp \
+    easyBMP/EasyBMP_Font.cpp \
+    easyBMP/EasyBMP_Geometry.cpp
 
 HEADERS += \
     systemtask.h \
     task.h \
     job.h \
-    scheduler.h
+    scheduler.h \
+    easyBMP/EasyBMP.h \
+    easyBMP/EasyBMP_BMP.h \
+    easyBMP/EasyBMP_DataStructures.h \
+    easyBMP/EasyBMP_VariousBMPutilities.h \
+    easyBMP/EasyBMP_Font.h \
+    easyBMP/EasyBMP_Geometry.h
 
 DISTFILES += \
     makefile \

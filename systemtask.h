@@ -46,14 +46,6 @@ private:
     int LCM(int a, int b);
 
     /*!
-     * \brief Generate a random integer according to the given arguments.
-     * \param min The minimum value (included in the bound)
-     * \param max the maximal value (excluded from the bound)
-     * \return A random integer in the interval [min, max[
-     */
-    int random(int min, int max);
-
-    /*!
      * \brief Generate the minimal set of jobs for each tasks of the system.
      *        The minimal set of jobs corresponds to tha maximum release of jobs
      *        of a task during the feasible interval.
@@ -138,9 +130,21 @@ public:
      * \return a in std::string format
      */
     std::string intToStr(int a);
-    std::vector<Task> &getTaskSet();
-};
 
+    /*!
+     * \brief getTaskSet
+     * \return
+     */
+    std::vector<Task> &getTaskSet();
+
+    /*!
+     * \brief Generate a random integer according to the given arguments.
+     * \param min The minimum value (included in the bound)
+     * \param max the maximal value (excluded from the bound)
+     * \return A random integer in the interval [min, max[
+     */
+    int random(int min, int max);
+};
 
 
 #endif // SYSTEMTASK_H

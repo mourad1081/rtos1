@@ -102,7 +102,7 @@ ScheduleLogs Scheduler::scheduleGlobal()
                 }
                 else {
                     // NO, continue executing the previous job.
-                    highestPriorityJob = previousJob;
+                    highestPriorityJob = jobAt(t-1, P);
                     assign(P, t, highestPriorityJob);
                     // Deadline will miss ?
                     if(highestPriorityJob->absolute_deadline
@@ -128,7 +128,6 @@ ScheduleLogs Scheduler::scheduleGlobal()
            / (double) (scheduleInfos.studyInterval.max*nbProcessors);
 
 
-
     return scheduleInfos;
 }
 
@@ -139,6 +138,104 @@ ScheduleLogs Scheduler::scheduleGlobal()
 ScheduleLogs Scheduler::schedulePartitionned()
 {
     return {};
+}
+
+void Scheduler::exportToBMP(string pathFile)
+{
+    int w = 1300, h = 700, padding = 50;
+    int lengthTimeAxis      = w - 2*padding;
+    int lengthProcessorAxis = h - 2*padding;
+    int lengthDashes = 10;
+    int widthAxis    =  3;
+    int cptProcessor =  1;
+    std::string indexProcessor;
+    BMP image;
+    std::map<Task *, RGBApixel> taskColors;
+    image.SetSize(w, h);
+
+    // Time axis
+    for(int i = padding; i < padding + lengthTimeAxis; i++) {
+        for(int j = h - padding - (int)(widthAxis/2); j < h - padding + (int)(widthAxis/2); j++) {
+            image(i, j)->Blue  = 255;
+            image(i, j)->Red   =   0;
+            image(i, j)->Green =   0;
+        }
+        if(i%50 == 0)
+            PrintString(image,
+                        const_cast<char*>(std::to_string(i).c_str()),
+                        i, lengthProcessorAxis + padding + (int)(padding*0.25),
+                        8, {0,0,0,0} /* = {Blue, Green, Red, Alpha} */ );
+    }
+
+    // Dashes on time axis
+    int offset = lengthTimeAxis / taskSystem.feasibleInterval().max;
+    for(int i = padding; i < padding + lengthTimeAxis; i += offset)
+    {
+        for(int j =  lengthProcessorAxis + padding - (int)(lengthDashes/2);
+                j <  lengthProcessorAxis + padding + (int)(lengthDashes/2);
+                j++)
+        {
+            image(i, j)->Blue  = 0;
+            image(i, j)->Red   = 0;
+            image(i, j)->Green = 0;
+        }
+    }
+
+    // Processors axis
+    for(int i = padding; i < padding + lengthProcessorAxis; i++) {
+        for(int j = padding - (int)(widthAxis/2); j < padding + (int)(widthAxis/2); j++) {
+            image(j, i)->Blue  = 255;
+            image(j, i)->Red   =   0;
+            image(j, i)->Green =   0;
+        }
+    }
+
+    // Dashes on processor axis
+    offset = lengthProcessorAxis / nbProcessors;
+    for(int i = padding; i < padding + lengthProcessorAxis; i += offset)
+    {
+        for(int j =  padding - (int)(lengthDashes/2);
+                j <  padding + (int)(lengthDashes/2);
+                j++)
+        {
+            image(j, i)->Blue  = 0;
+            image(j, i)->Red   = 0;
+            image(j, i)->Green = 0;
+        }
+        indexProcessor = std::string("Pi " + std::to_string(cptProcessor));
+        PrintString(image, const_cast<char*>(indexProcessor.c_str()), (int)(padding*0.25), i, 10, {0,0,0,0} /* = {Blue, Green, Red, Alpha} */ );
+        cptProcessor++;
+    }
+
+    // Assignments
+    for(unsigned int i = 0; i < assignments.size(); i++) {
+        // Assign a random color to the task if it hasn't one yet.
+        if(taskColors.find(assignments[i].assignedJob->parent) == taskColors.end()) {
+            taskColors[assignments[i].assignedJob->parent] = {
+                (ebmpBYTE) taskSystem.random(1, 256),
+                (ebmpBYTE) taskSystem.random(1, 256),
+                (ebmpBYTE) taskSystem.random(1, 256),
+                (ebmpBYTE) 0
+            };
+        }
+        int fromX, fromY, toX, toY;
+        fromX = padding + (lengthTimeAxis/taskSystem.feasibleInterval().max)*assignments[i].slotTime;
+        fromY = padding + (lengthProcessorAxis/nbProcessors)*assignments[i].numProcessor;
+        toX   = fromX + (lengthTimeAxis/taskSystem.feasibleInterval().max);
+        toY   = fromY + (lengthProcessorAxis/nbProcessors)/2;
+
+        // Print a square in the corresponding slot of time.
+        for (int x = fromX; x < toX; x++){
+            for (int y = fromY; y < toY; y++) {
+                image(x,y)->Blue = taskColors[assignments[i].assignedJob->parent].Blue;
+                image(x,y)->Green = taskColors[assignments[i].assignedJob->parent].Green;
+                image(x,y)->Red = taskColors[assignments[i].assignedJob->parent].Red;
+            }
+        }
+
+    }
+
+    image.WriteToFile("out.bmp");
 }
 
 Job *Scheduler::jobAt(int slot, int numProcessor)

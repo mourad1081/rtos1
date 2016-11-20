@@ -164,9 +164,12 @@ int studyDM(int argc, char *argv[]) {
 int main(int argc, char *argv[])
 {
     SystemTask to("out.txt");
+    Scheduler s(to, 4);
+    s.scheduleGlobal();
+    s.exportToBMP("");
 
     char *args[] = {"simDM", "-g", "out.txt", "4"};
-    simDM(4, args);
+//     simDM(4, args);
 
     #if defined TASK_GENERATOR_MODULE
         return taskGenerator(argc, argv);

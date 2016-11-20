@@ -3,6 +3,8 @@
 #include <map>
 #include <tuple>
 #include "systemtask.h"
+#include "easyBMP/EasyBMP.h"
+#include "easyBMP/EasyBMP_Font.h"
 
 struct ScheduleLogs {
     int nbIdleTotal;
@@ -91,6 +93,7 @@ class Scheduler
 
         ScheduleLogs schedulePartitionned();
 
+        void exportToBMP(std::string pathFile);
 };
 
 #endif // TIMELINE_H
