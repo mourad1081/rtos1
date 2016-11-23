@@ -10,12 +10,19 @@ SystemTask::SystemTask(std::vector<Task> tasks)
 
 SystemTask::SystemTask(int nbTask, double U)
 {
+    int randIndex = 0, tmpC = 0, gcd = 0;
     if(U <= 0)
-        throw logic_error("error. U must be in the range (0, 100].");
+        throw logic_error("error. U must be greather than zero.");
+
+    if(U > 100*nbTask)
+        cout << "\033[0;36m" << "Warning : Asking for an utilisation greather "
+                                "than nbTask * 100% will always fail if you "
+                                "schedule the system. However, the system will"
+                                " be generated now." << "\033[0m" << endl;
 
     // We're generating an U close to the original U.
     // Not necessarily equals
-    int Urand = random(U*0.95, U*1.05);
+    int Urand = random(U*0.96, U);
     int T, multiplier = 1;
 
     // Critical case => nbTask > U
@@ -26,16 +33,35 @@ SystemTask::SystemTask(int nbTask, double U)
     T = 100*multiplier;
 
     // General case => nbTask < U
-    // 1 -- Give 1 WCET to each task
-    // 2 -- For i = (nbTask, nbTask+1, ..., U-1, U) :
-    //      -> increment WCET in a random task
-    // 3 -- C = C / GCD(C, T); T = T / GCD(C, T);
+    // 1) -- Give 1 WCET to each task
     for(int i = 0; i < nbTask; i++)
-        this->taskSet.push_back(Task(random(0, 100), T, random(1, 100), 1));
+        this->taskSet.push_back(Task(random(0, 100), T, 1, 1, i));
+    // 2) -- For i = (nbTask, nbTask+1, ..., U-1, U) :
+    //          -> increment WCET in a random task
+    for(int i = nbTask; i < Urand; i++) {
+        randIndex = random(0, nbTask-1);
+        // We do not give more than 100% of utilisation on a random task.
+        // So, we affect to randIndex a random index where
+        // the WCET of the random task is lesser than T.
+        // (We do that only if U < 100% * nbTasks.)
+        // The 2nd condition is there to exclude the case where U > 100% * nbTask
+        if(Urand > T && (Urand <= T * nbTask))
+            while(this->taskSet[randIndex = random(0, nbTask-1)].WCET == T);
+        this->taskSet[randIndex].WCET++;
+    }
+    // 3) Make the fraction C/T irreductible (for a smaller period)
+    // And generate a decent deadline for each task. (i.e. between C and T)
+    for(int i = 0; i < nbTask; i++) {
+        tmpC = taskSet[i].WCET;
+        // Generate random deadline in interval [C, T]
 
-    for(int i = 0; i < Urand; i++)
-        this->taskSet[ random(0, nbTask-1) ].WCET++;
-
+        gcd = GCD(tmpC, taskSet[i].period);
+        // make its C/T irreductible
+        taskSet[i].WCET   /= gcd;
+        taskSet[i].period /= gcd;
+        taskSet[i].deadline = random(taskSet[i].WCET, taskSet[i].period);
+    }
+    cout << SystemTask(taskSet).U() * 100 << "%" << endl;
     createJobs();
 }
 
@@ -43,11 +69,11 @@ SystemTask::SystemTask(char *pathFile)
 {
     string line;
     ifstream file(pathFile);
-    int T, C, D, O;
+    int T, C, D, O, cpt = 0;
 
     if (file.is_open()) {
         while (file >> O >> T >> D >> C) {
-            Task t(O, T, D, C);
+            Task t(O, T, D, C, cpt++);
             addtask(t);
         }
 
@@ -81,6 +107,8 @@ int SystemTask::LCM(int a, int b)
 
 int SystemTask::random(int min, int max)
 {
+    if(min >= max)
+        return min;
     std::mt19937 eng(this->rd()); // seed the generator
     std::uniform_int_distribution<> distr(min, max); // define the range
     return distr(eng);
@@ -89,16 +117,21 @@ int SystemTask::random(int min, int max)
 void SystemTask::createJobs()
 {
     int maxInterval = feasibleInterval().max;
+    cout << maxInterval << "<<< max interval";
     int nbJobs;
     for(unsigned int i = 0; i < taskSet.size(); i++) {
-        nbJobs = (int) (maxInterval / (taskSet[i].offset + taskSet[i].period));
+        nbJobs = (int) ((maxInterval - taskSet[i].offset) / taskSet[i].period);
+        cout << "for task " << i << " nb jobs = " << nbJobs << endl;
         for(int j = 0; j < nbJobs; j++) {
-            Job job(taskSet[i].offset + j*taskSet[i].period,
-                    taskSet[i].WCET,
-                    taskSet[i].deadline,
-                    taskSet[i].offset + j*taskSet[i].period + taskSet[i].deadline);
+            Job job {
+                taskSet[i].offset + j*taskSet[i].period,
+                taskSet[i].WCET,
+                taskSet[i].deadline,
+                taskSet[i].offset + j*taskSet[i].period + taskSet[i].deadline,
+                taskSet[i].WCET,
+                &taskSet[i]
+            };
             taskSet[i].addJob(job);
-            job.parent = &taskSet[i];
         }
     }
 }

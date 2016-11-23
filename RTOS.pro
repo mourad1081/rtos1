@@ -7,7 +7,6 @@ SOURCES += \
     main.cpp \
     systemtask.cpp \
     task.cpp \
-    job.cpp \
     scheduler.cpp \
     easyBMP/EasyBMP.cpp \
     easyBMP/EasyBMP_Font.cpp \
@@ -16,7 +15,6 @@ SOURCES += \
 HEADERS += \
     systemtask.h \
     task.h \
-    job.h \
     scheduler.h \
     easyBMP/EasyBMP.h \
     easyBMP/EasyBMP_BMP.h \

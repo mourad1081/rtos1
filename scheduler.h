@@ -6,7 +6,10 @@
 #include "easyBMP/EasyBMP.h"
 #include "easyBMP/EasyBMP_Font.h"
 
-struct ScheduleLogs {
+/*!
+ * \brief The ScheduleInfos struct is used to store all stats after a scheduling
+ */
+struct ScheduleInfos {
     int nbIdleTotal;
     // key : num processor, value : nb idle for that processor
     std::map<int, int> nbIdlePerProcessor;
@@ -89,11 +92,17 @@ class Scheduler
          */
         void assign(int numProcessor, int slot, Job *job);
 
-        ScheduleLogs scheduleGlobal();
+        ScheduleInfos scheduleGlobal();
 
-        ScheduleLogs schedulePartitionned();
+        ScheduleInfos schedulePartitionned();
 
         void exportToBMP(std::string pathFile);
+
+        void printInfos(ScheduleInfos &infos);
+
+        void addProcessor();
+
+        void removeProcessor();
 };
 
 #endif // TIMELINE_H

@@ -1,8 +1,7 @@
 #include "task.h"
 
-Task::Task() : Task(0, 0, 0, 0) { }
-
-Task::Task(int O, int T, int D, int C)
+Task::Task(int O, int T, int D, int C) : Task(O, T, D, C, 0) {}
+Task::Task(int O, int T, int D, int C, int num)
 {
     if(D > T)
         throw std::invalid_argument("constrained deadlines must have D <= T");
@@ -11,7 +10,7 @@ Task::Task(int O, int T, int D, int C)
     this->period = T;
     this->deadline = D;
     this->offset = O;
-
+    this->num = num;
 }
 
 
@@ -30,4 +29,9 @@ Job &Task::releaseJob()
 Job &Task::nextJob()
 {
     return jobs.front();
+}
+
+
+bool Task::hasNextJob() {
+    return !jobs.empty();
 }

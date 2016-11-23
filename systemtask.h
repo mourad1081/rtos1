@@ -14,10 +14,10 @@
 
 #include "task.h"
 
-struct {
+struct Interval {
     int min;
     int max;
-} typedef Interval;
+};
 
 class SystemTask
 {

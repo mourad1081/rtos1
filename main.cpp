@@ -111,7 +111,8 @@ int taskGenerator(int argc, char *argv[]) {
 
 int simDM(int argc, char *argv[]) {
     bool partitionned = false;
-    bool global = false;
+    bool global       = false;
+    bool image        = false;
     char *pathFile;
     int nbProcessors;
 
@@ -121,10 +122,12 @@ int simDM(int argc, char *argv[]) {
     else {
         global       = !strcmp(argv[1], "-g");
         partitionned = !strcmp(argv[1], "-p");
+        pathFile     = argv[2];
+        nbProcessors = strToInt(argv[3]);
+        image        = !strcmp(argv[4], "-i");
         if(partitionned == global)
             throw std::invalid_argument(ERROR_SIM_DM);
-        pathFile = argv[2];
-        nbProcessors = strToInt(argv[3]);
+
     }
 
     // Creation of the system tasks
@@ -132,12 +135,22 @@ int simDM(int argc, char *argv[]) {
 
     // Priority assignment
     to.assignPriority();
-
+    ScheduleInfos log;
     Scheduler scheduler(to, nbProcessors);
 
-    partitionned ? scheduler.schedulePartitionned() :
-                   scheduler.scheduleGlobal();
+    if(partitionned) {
+        scheduler.schedulePartitionned();
+    } else {
+        log = scheduler.scheduleGlobal();
+        while(log.failed) {
+            scheduler.addProcessor();
+        }
+    }
 
+
+    scheduler.printInfos(s);
+    if(image)
+        scheduler.exportToBMP("graph.bmp");
     return 0;
 }
 
@@ -163,13 +176,13 @@ int studyDM(int argc, char *argv[]) {
 
 int main(int argc, char *argv[])
 {
-    SystemTask to("out.txt");
-    Scheduler s(to, 4);
-    s.scheduleGlobal();
-    s.exportToBMP("");
+    // Tests
+    char *args[] = {"taskGenerator", "-n", "7", "-u", "700", "-o", "out.txt"};
+    taskGenerator(7, args);
+    system("cat out.txt");
+    char *args2[] = {"simDM", "-g","out.txt", "6", "-i" };
+    simDM(5, args2);
 
-    char *args[] = {"simDM", "-g", "out.txt", "4"};
-//     simDM(4, args);
 
     #if defined TASK_GENERATOR_MODULE
         return taskGenerator(argc, argv);

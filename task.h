@@ -2,21 +2,31 @@
 #define TASK_H
 #include <stdexcept>
 #include <queue>
-#include "job.h"
+
+class Task;
+
+struct Job {
+    int release;
+    int computation;
+    int deadline;
+    int absolute_deadline;
+    // The remeaning amount of time needed to finish the job.
+    int remeaningComputation;
+    Task *parent;
+};
 
 class Task {
 
   private:
     std::queue<Job> jobs;
-
   public:
     Task(int O, int T, int D, int C);
-    Task();
+    Task(int O, int T, int D, int C, int num);
     int period;
     int deadline;
     int offset;
     int WCET;
-
+    int num; // Number of the task (for instance : task number 9)
     void addJob(Job &j);
 
     /*!
@@ -30,6 +40,12 @@ class Task {
      * \return The last job in the queue.
      */
     Job &nextJob();
+
+    /*!
+     * \brief hasNextJob
+     * \return
+     */
+    bool hasNextJob();
 };
 
 #endif // TASK_H

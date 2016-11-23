@@ -13,13 +13,13 @@ Scheduler::Scheduler(SystemTask &to, int nbProcessors) : taskSystem(to)
 }
 
 
-ScheduleLogs Scheduler::scheduleGlobal()
+ScheduleInfos Scheduler::scheduleGlobal()
 {
     Job *highestPriorityJob, *previousJob;
     // Clear the previous scheduling
     assignments.clear();
-    // Informations about this schedule
-    ScheduleLogs scheduleInfos;
+    // First variable : Informations about this schedule
+    ScheduleInfos scheduleInfos;
     for(int i = 0; i < nbProcessors; i++) {
         scheduleInfos.nbIdlePerProcessor[i] = 0;
         scheduleInfos.nbPreemptionsPerProcessor[i] = 0;
@@ -27,6 +27,7 @@ ScheduleLogs Scheduler::scheduleGlobal()
     }
     scheduleInfos.studyInterval = {0, taskSystem.feasibleInterval().max};
     scheduleInfos.nbDesiredProcessors = nbProcessors;
+    scheduleInfos.nbRequiredProcessors = -1;
     scheduleInfos.failed = false;
     // Lambda that represents how jobs must be compared
     auto comparator = [](Job * left, Job *right) -> bool {
@@ -38,84 +39,51 @@ ScheduleLogs Scheduler::scheduleGlobal()
                         decltype(comparator)> jobs_to_execute(comparator);
     
     // For each slot of time and while the scheduling hasn't failed
-    for(int t = 0; t < taskSystem.feasibleInterval().max && !scheduleInfos.failed; t++)
+    for(int t = 0;
+        t < taskSystem.feasibleInterval().max && !scheduleInfos.failed;
+        t++)
     {
         // All tasks that must release a job do it.
         // (release time of the next job of a task >= i)
         for(Task &task : taskSystem.getTaskSet())
-            if (task.nextJob().release == t)
+            if (task.hasNextJob() && task.nextJob().release == t)
                 jobs_to_execute.push(&task.releaseJob());
 
         // And then, for each processors and while the scheduling hasn't failed
         for(int P = 0; P < nbProcessors && !scheduleInfos.failed; P++) {
-            // Is there any job at slot t-1  OR
-            // is the task at slot t-1 on the processor P finished ?
-            previousJob = jobAt(P, t-1);
-            if(previousJob == nullptr
-                    || (previousJob != nullptr
-                        && previousJob->remeaningComputation == 0))
-            {
-                // YES, release the next highest priority job if there is one.
-                if(! jobs_to_execute.empty()) {
-                    highestPriorityJob = jobs_to_execute.top();
-                    assign(P, t, highestPriorityJob);
-                    jobs_to_execute.pop();
-
-                    // Deadline will miss ?
-                    if(highestPriorityJob->absolute_deadline
-                         < (t + highestPriorityJob->remeaningComputation))
-                    {
-                        scheduleInfos.failed = true;
-                    }
-                    else
-                        highestPriorityJob->remeaningComputation--;
-
-                } else {
-                    // There is no job to execute. Insert an idle time.
-                    scheduleInfos.nbIdlePerProcessor[P]++;
-                    scheduleInfos.nbIdleTotal++;
-                }
-            }
-            else {
-                // NO, is there any awaiting job with a higher priority ?
-                if(!jobs_to_execute.empty()
-                  && (jobs_to_execute.top()->absolute_deadline
-                      < previousJob->absolute_deadline)) {
-
-                    // YES, swap the awaiting job with the assigned.
-                    highestPriorityJob = jobs_to_execute.top();
-                    jobs_to_execute.pop();
-                    jobs_to_execute.push(previousJob);
-                    assign(P, t, highestPriorityJob);
-                    // Deadline will miss ?
-                    if(highestPriorityJob->absolute_deadline
-                         < (t + highestPriorityJob->remeaningComputation))
-                    {
-                        scheduleInfos.failed = true;
-                    }
-                    else
-                        highestPriorityJob->remeaningComputation--;
-
-                    // So, a preemption happened on processor P.
+            // Is there any job to execute ?
+            if(! jobs_to_execute.empty()) {
+                highestPriorityJob = jobs_to_execute.top();
+                assign(P, t, highestPriorityJob);
+                jobs_to_execute.pop();
+                // Deadline will miss ?
+                scheduleInfos.failed = highestPriorityJob->absolute_deadline
+                           < (t + highestPriorityJob->remeaningComputation);
+                // Use Processor
+                highestPriorityJob->remeaningComputation--;
+                // A preemption occured ?
+                previousJob = jobAt(t-1, P);
+                if((t > 0) && (previousJob != IDLE)
+                           && (previousJob != jobAt(t, P)))
+                {
                     scheduleInfos.nbPreemptionsPerProcessor[P]++;
                     scheduleInfos.nbPreemptionsTotal++;
                 }
-                else {
-                    // NO, continue executing the previous job.
-                    highestPriorityJob = jobAt(t-1, P);
-                    assign(P, t, highestPriorityJob);
-                    // Deadline will miss ?
-                    if(highestPriorityJob->absolute_deadline
-                         < (t + highestPriorityJob->remeaningComputation))
-                    {
-                        scheduleInfos.failed = true;
-                    }
-                    else
-                        highestPriorityJob->remeaningComputation--;
-                }
+            } else {
+                // There is no job to execute.
+                scheduleInfos.nbIdlePerProcessor[P]++;
+                scheduleInfos.nbIdleTotal++;
             }
         }
+
+        // All not finished jobs at time t returns to the execution queue
+        for(int P = 0; P < nbProcessors; P++) {
+            Job *j = jobAt(t, P);
+            if(j != IDLE && j->remeaningComputation > 0)
+                jobs_to_execute.push(j);
+        }
     }
+
 
     // Computation of utilisations...
     for(int P = 0; P < nbProcessors; P++) {
@@ -127,15 +95,58 @@ ScheduleLogs Scheduler::scheduleGlobal()
              (double) (scheduleInfos.studyInterval.max*nbProcessors - scheduleInfos.nbIdleTotal)
            / (double) (scheduleInfos.studyInterval.max*nbProcessors);
 
-
     return scheduleInfos;
 }
 
 
+void Scheduler::printInfos(ScheduleInfos &infos)
+{
+    if(infos.failed)
+        cerr << "The scheduling has failed dammit" << endl;
+    cout << "+---------------------------------------+" << endl
+         << "Infos : " << endl
+         << "Desired Processors : "    << infos.nbDesiredProcessors  << endl
+         << "Required Processor(s) : " << infos.nbRequiredProcessors << endl
+         << "Study interval : ["       << infos.studyInterval.min    << ", "
+         << infos.studyInterval.max    << "]"                        << endl
+         << "Global utilisation : "    << infos.utilisationTotal     << endl
+         << "--------------------"     << endl;
+
+    for(auto &entry : infos.utilisationPerProcessor) {
+        cout << "Utilisation of processor " << entry.first
+             << " : " << entry.second       << endl;
+    }
+
+    cout << "Total idle time : " << infos.nbIdleTotal << endl
+         << "-----------------"  << endl;
+
+    for(auto &entry : infos.nbIdlePerProcessor) {
+        cout << "Idle time of processor " << entry.first
+             << " : " << entry.second     << endl;
+    }
+
+    cout << "Total number of preemptions : " << infos.nbPreemptionsTotal << endl
+         << "-----------------------------"  << endl;
+
+    for(auto &entry : infos.nbPreemptionsPerProcessor) {
+        cout << "Number of preemption of processor " << entry.first
+             << " : " << entry.second                << endl;
+    }
+
+}
+
+void Scheduler::addProcessor()
+{
+    nbProcessors++;
+}
+
+void Scheduler::removeProcessor()
+{
+    nbProcessors--;
+}
 
 
-
-ScheduleLogs Scheduler::schedulePartitionned()
+ScheduleInfos Scheduler::schedulePartitionned()
 {
     return {};
 }
@@ -145,7 +156,6 @@ void Scheduler::exportToBMP(string pathFile)
     int w = 1300, h = 700, padding = 50;
     int lengthTimeAxis      = w - 2*padding;
     int lengthProcessorAxis = h - 2*padding;
-    int lengthDashes = 10;
     int widthAxis    =  3;
     int cptProcessor =  1;
     std::string indexProcessor;
@@ -155,56 +165,30 @@ void Scheduler::exportToBMP(string pathFile)
 
     // Time axis
     for(int i = padding; i < padding + lengthTimeAxis; i++) {
-        for(int j = h - padding - (int)(widthAxis/2); j < h - padding + (int)(widthAxis/2); j++) {
-            image(i, j)->Blue  = 255;
-            image(i, j)->Red   =   0;
-            image(i, j)->Green =   0;
+        for(int j = h - padding - (int)(widthAxis/2);
+            j < h - padding + (int)(widthAxis/2);
+            j++)
+        {
+            image.SetPixel(i, j, {0, 0, 0, 0});
         }
-        if(i%50 == 0)
-            PrintString(image,
-                        const_cast<char*>(std::to_string(i).c_str()),
-                        i, lengthProcessorAxis + padding + (int)(padding*0.25),
-                        8, {0,0,0,0} /* = {Blue, Green, Red, Alpha} */ );
     }
 
-    // Dashes on time axis
+    // grid on time axis
     int offset = lengthTimeAxis / taskSystem.feasibleInterval().max;
+    int cptDashes = 0;
     for(int i = padding; i < padding + lengthTimeAxis; i += offset)
     {
-        for(int j =  lengthProcessorAxis + padding - (int)(lengthDashes/2);
-                j <  lengthProcessorAxis + padding + (int)(lengthDashes/2);
+        for(int j =  padding;
+                j <  lengthProcessorAxis + padding;
                 j++)
         {
-            image(i, j)->Blue  = 0;
-            image(i, j)->Red   = 0;
-            image(i, j)->Green = 0;
+            image.SetPixel(i, j, {210, 210, 210, 0});
         }
-    }
-
-    // Processors axis
-    for(int i = padding; i < padding + lengthProcessorAxis; i++) {
-        for(int j = padding - (int)(widthAxis/2); j < padding + (int)(widthAxis/2); j++) {
-            image(j, i)->Blue  = 255;
-            image(j, i)->Red   =   0;
-            image(j, i)->Green =   0;
-        }
-    }
-
-    // Dashes on processor axis
-    offset = lengthProcessorAxis / nbProcessors;
-    for(int i = padding; i < padding + lengthProcessorAxis; i += offset)
-    {
-        for(int j =  padding - (int)(lengthDashes/2);
-                j <  padding + (int)(lengthDashes/2);
-                j++)
-        {
-            image(j, i)->Blue  = 0;
-            image(j, i)->Red   = 0;
-            image(j, i)->Green = 0;
-        }
-        indexProcessor = std::string("Pi " + std::to_string(cptProcessor));
-        PrintString(image, const_cast<char*>(indexProcessor.c_str()), (int)(padding*0.25), i, 10, {0,0,0,0} /* = {Blue, Green, Red, Alpha} */ );
-        cptProcessor++;
+        if((cptDashes % (taskSystem.feasibleInterval().max/taskSystem.getTaskSet().size()) == 0) || (i == (padding + lengthTimeAxis-1)))
+            PrintString(image, const_cast<char*>(std::to_string(cptDashes).c_str()),
+                        i, lengthProcessorAxis + padding + (int)(padding*0.25),
+                        8, {0,0,0,0} /* = {Blue, Green, Red, Alpha} */ );
+        cptDashes++;
     }
 
     // Assignments
@@ -227,12 +211,40 @@ void Scheduler::exportToBMP(string pathFile)
         // Print a square in the corresponding slot of time.
         for (int x = fromX; x < toX; x++){
             for (int y = fromY; y < toY; y++) {
-                image(x,y)->Blue = taskColors[assignments[i].assignedJob->parent].Blue;
-                image(x,y)->Green = taskColors[assignments[i].assignedJob->parent].Green;
-                image(x,y)->Red = taskColors[assignments[i].assignedJob->parent].Red;
+                image.SetPixel(x, y, {
+                    taskColors[assignments[i].assignedJob->parent].Blue,
+                    taskColors[assignments[i].assignedJob->parent].Green,
+                    taskColors[assignments[i].assignedJob->parent].Red,
+                    0
+                });
             }
         }
+    }
 
+    // grid on processor axis
+    offset = lengthProcessorAxis / nbProcessors;
+    for(int i = padding; i < padding + lengthProcessorAxis; i += offset)
+    {
+        for(int j =  padding;
+                j <  padding + lengthTimeAxis;
+                j++)
+        {
+            image.SetPixel(j, i, {120, 120, 120, 0});
+        }
+        indexProcessor = std::string("Pi " + std::to_string(cptProcessor));
+        PrintString(image, const_cast<char*>(indexProcessor.c_str()),
+                    (int)(padding*0.25), i, 10, {0,0,0,0});
+        cptProcessor++;
+    }
+
+    // Processors axis
+    for(int i = padding; i < padding + lengthProcessorAxis; i++) {
+        for(int j = padding - (int)(widthAxis/2);
+                j < padding + (int)(widthAxis/2);
+                j++)
+        {
+            image.SetPixel(j,i, {0, 0, 0, 0});
+        }
     }
 
     image.WriteToFile("out.bmp");
@@ -249,7 +261,7 @@ Job *Scheduler::jobAt(int slot, int numProcessor)
                                     && a.slotTime == slot;
                            });
 
-    return it != assignments.end() ? (*it).assignedJob : nullptr;
+    return it != assignments.end() ? (*it).assignedJob : IDLE;
 }
 
 void Scheduler::assign(int numProcessor, int slot, Job *job)
