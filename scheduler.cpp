@@ -18,6 +18,7 @@ ScheduleInfos Scheduler::scheduleGlobal()
     Job *highestPriorityJob, *previousJob;
     // Clear the previous scheduling
     assignments.clear();
+
     // First variable : Informations about this schedule
     ScheduleInfos scheduleInfos;
     for(int i = 0; i < nbProcessors; i++) {
@@ -29,6 +30,17 @@ ScheduleInfos Scheduler::scheduleGlobal()
     scheduleInfos.nbDesiredProcessors = nbProcessors;
     scheduleInfos.nbRequiredProcessors = -1;
     scheduleInfos.failed = false;
+
+    // First, check if U > 100% * nbProcessors
+    // OR there is more tasks than processors
+    // It will always fail if it is the case.
+    if(taskSystem.U() > nbProcessors
+            || taskSystem.getTaskSet().size() > nbProcessors) {
+        scheduleInfos.failed = true;
+        scheduleInfos.optionalMessage = "The scheduling will always fail with "
+                                        "that number of processors. "
+                                        "Perhaps retry with more.";
+    }
     // Lambda that represents how jobs must be compared
     auto comparator = [](Job * left, Job *right) -> bool {
         return left->absolute_deadline > right->absolute_deadline;
@@ -59,6 +71,10 @@ ScheduleInfos Scheduler::scheduleGlobal()
                 // Deadline will miss ?
                 scheduleInfos.failed = highestPriorityJob->absolute_deadline
                            < (t + highestPriorityJob->remeaningComputation);
+                if(scheduleInfos.failed) {
+                    scheduleInfos.optionalMessage = "Deadline miss ! "
+                                                    "Scheduling has stopped.";
+                }
                 // Use Processor
                 highestPriorityJob->remeaningComputation--;
                 // A preemption occured ?
@@ -101,8 +117,11 @@ ScheduleInfos Scheduler::scheduleGlobal()
 
 void Scheduler::printInfos(ScheduleInfos &infos)
 {
-    if(infos.failed)
-        cerr << "The scheduling has failed dammit" << endl;
+    if(infos.failed) {
+        cout << "====== The scheduling has failed ======" << endl;
+        cout << " Desired processors : " << infos.nbDesiredProcessors << endl;
+        return;
+    }
     cout << "+---------------------------------------+" << endl
          << "Infos : " << endl
          << "Desired Processors : "    << infos.nbDesiredProcessors  << endl

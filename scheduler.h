@@ -21,6 +21,7 @@ struct ScheduleInfos {
     int nbDesiredProcessors;
     Interval studyInterval;
     bool failed;
+    std::string optionalMessage;
 };
 
 struct Assignment {
@@ -98,7 +99,7 @@ class Scheduler
 
         void exportToBMP(std::string pathFile);
 
-        void printInfos(ScheduleInfos &infos);
+        static void printInfos(ScheduleInfos &infos);
 
         void addProcessor();
 

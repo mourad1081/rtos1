@@ -135,22 +135,58 @@ int simDM(int argc, char *argv[]) {
 
     // Priority assignment
     to.assignPriority();
-    ScheduleInfos log;
-    Scheduler scheduler(to, nbProcessors);
+    ScheduleInfos log, logRequired;
+    Scheduler *scheduler = new Scheduler(to, nbProcessors);
 
-    if(partitionned) {
-        scheduler.schedulePartitionned();
+    if(partitionned)  {
+        log = scheduler->schedulePartitionned();
+
+        // TODO :
+
+
+
     } else {
-        log = scheduler.scheduleGlobal();
-        while(log.failed) {
-            scheduler.addProcessor();
+        // 1. schedule global with desired parameters
+        // 2. schedule global from U to nbtask and stop as soon as it succeeds
+        // 3. As soon as it succeeds, that schedule contains the
+        //    required number of processors.
+        // 4. If fail, the system cannot be scheduled using global asignment.
+        // 5. Otherwise, print log
+        //   (of the first scheduling at step 1 if it has succeeded.
+        //   Otherwise, print the log of the scheduling that succeed at step 2.)
+        log = scheduler->scheduleGlobal();
+        logRequired.failed = true;
+        if(log.failed) {
+            cout << "The system has failed with "
+                 << nbProcessors << " processors. Retrying with more..."
+                 << endl;
+        }
+
+        for(int i = std::ceil(to.U());
+            i <= to.getTaskSet().size() && logRequired.failed;
+            i++)
+        {
+            scheduler = new Scheduler(to, i);
+            logRequired = scheduler->scheduleGlobal();
+        }
+        if(logRequired.failed) {
+            cout << "The system cannot be scheduling using global"
+                 << " asignment and DM scheduling."
+                 << endl;
+        } else {
+            // Update desired/required #processors.
+            log.nbRequiredProcessors = logRequired.nbDesiredProcessors;
+            logRequired.nbRequiredProcessors = logRequired.nbDesiredProcessors;
+            logRequired.nbDesiredProcessors = log.nbDesiredProcessors;
+
+            log.failed ? Scheduler::printInfos(logRequired)
+                       : Scheduler::printInfos(log);
         }
     }
 
-
-    scheduler.printInfos(s);
     if(image)
-        scheduler.exportToBMP("graph.bmp");
+        scheduler->exportToBMP("graph.bmp");
+
     return 0;
 }
 
@@ -180,7 +216,7 @@ int main(int argc, char *argv[])
     char *args[] = {"taskGenerator", "-n", "7", "-u", "700", "-o", "out.txt"};
     taskGenerator(7, args);
     system("cat out.txt");
-    char *args2[] = {"simDM", "-g","out.txt", "6", "-i" };
+    char *args2[] = {"simDM", "-g","out.txt", "3", "-i" };
     simDM(5, args2);
 
 

@@ -117,11 +117,9 @@ int SystemTask::random(int min, int max)
 void SystemTask::createJobs()
 {
     int maxInterval = feasibleInterval().max;
-    cout << maxInterval << "<<< max interval";
     int nbJobs;
     for(unsigned int i = 0; i < taskSet.size(); i++) {
         nbJobs = (int) ((maxInterval - taskSet[i].offset) / taskSet[i].period);
-        cout << "for task " << i << " nb jobs = " << nbJobs << endl;
         for(int j = 0; j < nbJobs; j++) {
             Job job {
                 taskSet[i].offset + j*taskSet[i].period,
