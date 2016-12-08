@@ -2,9 +2,9 @@
 #define TIMELINE_H
 #include <map>
 #include <tuple>
+#include <sstream>
 #include "systemtask.h"
 #include "easyBMP/EasyBMP.h"
-#include "easyBMP/EasyBMP_Font.h"
 
 /*!
  * \brief The ScheduleInfos struct is used to store all stats after a scheduling
@@ -25,18 +25,17 @@ struct ScheduleInfos {
 };
 
 struct Assignment {
-    Job *assignedJob;
+    int numTaskOfJob;
     int numProcessor;
-    int slotTime;
+    long slotTime;
 };
 
 class Scheduler
 {
     private:
-        int min;
-        int max;
+        long min;
+        long max;
         int nbProcessors;
-
         /*!
          * \brief The system of tasks to schedule
          */
@@ -46,7 +45,6 @@ class Scheduler
          * \brief To each slot of time, we assign a job to a processor.
          */
         std::vector<Assignment> assignments;
-
     public:
 
         /*!
@@ -70,20 +68,12 @@ class Scheduler
         Scheduler(SystemTask &to, int nbProcessors);
 
         /*!
-         * \brief Assign an amount of time of a job starting
-         *        from the minimum slot (second argument).
-         * \param j The job to assign to.
-         * \param startSlot
-         */
-        void assignJob(Job *j, int startSlot, int indexProcessor);
-
-        /*!
          * \brief Returns the job on the desired processor at the desired slot
          * \param slot The slot of time
          * \param numProcessor Number of processor
          * \return The assigned job
          */
-        Job *jobAt(int slot, int numProcessor);
+        int jobAt(long slot, int numProcessor);
 
         /*!
          * \brief Assign a job to a processor and a slot of time
@@ -91,19 +81,69 @@ class Scheduler
          * \param slot Slot of time
          * \param job The job to assign
          */
-        void assign(int numProcessor, int slot, Job *job);
+        void assign(int numProcessor, long slot, int numTaskOfJob);
 
+        /*!
+         * \brief scheduleGlobal
+         * \return
+         */
         ScheduleInfos scheduleGlobal();
 
-        ScheduleInfos schedulePartitionned();
+        /*!
+         * \brief schedulePartitionned
+         * \return
+         */
+        std::vector<ScheduleInfos> schedulePartitionned();
 
-        void exportToBMP(std::string pathFile);
+        /*!
+         * \brief exportToBMP
+         * \param pathFile
+         */
+        void exportToBMP(std::string pathFile = "scheduling.bmp");
 
+        /*!
+         * \brief countAssignments
+         * \param P
+         * \return
+         */
+        long countAssignments(int P);
+
+        /*!
+         * \brief (Used in scheduleGlobal()) Finds free slots on
+         *        the interval [0, Omax + 2P].
+         * \param from
+         * \param freeSlot
+         * \param freeProcessor
+         */
+        void findFreeSlot(long from, long *freeSlot, int *freeProcessor);
+
+        /*!
+         * \brief Produce a list of task system according to this system.
+         *        The list is produced using the best fit algorithm
+         *        of the bin packing problem.
+         * \return
+         */
+        std::vector<SystemTask> bestFit();
+
+        /*!
+         * \brief Put the task t in a task system regarding
+         *        the best fit algorithm.
+         * \param t The task to add in a task system.
+         * \param listPartitions The list of task system.
+         */
+        void fit(Task &t, std::vector<SystemTask> &listPartitions);
+
+        /*!
+         * \brief printInfos
+         * \param infos
+         */
         static void printInfos(ScheduleInfos &infos);
 
-        void addProcessor();
-
-        void removeProcessor();
+        /*!
+         * \brief toString
+         * \return
+         */
+        std::string toString();
 };
 
 #endif // TIMELINE_H

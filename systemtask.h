@@ -15,8 +15,8 @@
 #include "task.h"
 
 struct Interval {
-    int min;
-    int max;
+    long min;
+    long max;
 };
 
 class SystemTask
@@ -35,7 +35,7 @@ private:
      * @param b Second value
      * @return The grather common divisor
      */
-    int GCD(int a, int b);
+    long GCD(long a, long b);
 
     /*!
      * \brief Computes the least common multiple of two values
@@ -43,23 +43,24 @@ private:
      * @param b Second value
      * \return The least common multiple
      */
-    int LCM(int a, int b);
+    long LCM(long a, long b);
 
-    /*!
-     * \brief Generate the minimal set of jobs for each tasks of the system.
-     *        The minimal set of jobs corresponds to tha maximum release of jobs
-     *        of a task during the feasible interval.
-     */
-    void createJobs();
 
     std::random_device rd; // obtain a random number from hardware
 public:
+
+    SystemTask();
+    /*!
+     * \brief Copy constructor
+     * \param toCopy
+     */
+    SystemTask(SystemTask const& toCopy);
 
     /*!
      * \brief create a system with given set of tasks
      * \param tasks The set of tasks
      */
-    SystemTask(std::vector<Task> tasks);
+    SystemTask(std::vector<Task> &tasks);
 
     /*!
      * \brief Create a system with a random set of task
@@ -89,7 +90,19 @@ public:
      */
     int Omax();
 
+    /*!
+     * \brief Omin
+     * \return
+     */
     int Omin();
+
+
+    /*!
+     * \brief Generate the minimal set of jobs for each tasks of the system.
+     *        The minimal set of jobs corresponds to tha maximum release of jobs
+     *        of a task during the feasible interval.
+     */
+    void createJobs();
 
     /*!
      * \brief Returns the hyper-period of the sytem.
@@ -97,7 +110,7 @@ public:
      *        to is the set of task of this system.
      * \return The period of the sytem.
      */
-    int P();
+    long P();
 
     /*!
      * \brief Returns the feasible interval of the system.
@@ -109,13 +122,18 @@ public:
      * \brief Adds a task in the set
      * \param t the task
      */
-    void addtask(Task &t);
+    void addTask(Task &t);
 
     /*!
      * \brief Sorts the task set by deadline.
      *        (Smaller the deadline, hihger the priority, lower the index)
      */
     void assignPriority();
+
+    /*!
+     * \brief Sorts the system task by (decreasing) utilization
+     */
+    void sortByUtilization();
 
     /*!
      * \brief Returns this object in a string format

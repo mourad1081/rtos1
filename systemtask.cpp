@@ -1,8 +1,14 @@
-
 #include "systemtask.h"
 using namespace std;
 
-SystemTask::SystemTask(std::vector<Task> tasks)
+SystemTask::SystemTask(const SystemTask &toCopy)
+{
+    this->taskSet = toCopy.taskSet;
+    this->rd();
+}
+
+
+SystemTask::SystemTask(std::vector<Task> &tasks)
 {
     this->taskSet = tasks;
     createJobs();
@@ -36,6 +42,7 @@ SystemTask::SystemTask(int nbTask, double U)
     // 1) -- Give 1 WCET to each task
     for(int i = 0; i < nbTask; i++)
         this->taskSet.push_back(Task(random(0, 100), T, 1, 1, i));
+
     // 2) -- For i = (nbTask, nbTask+1, ..., U-1, U) :
     //          -> increment WCET in a random task
     for(int i = nbTask; i < Urand; i++) {
@@ -61,7 +68,6 @@ SystemTask::SystemTask(int nbTask, double U)
         taskSet[i].period /= gcd;
         taskSet[i].deadline = random(taskSet[i].WCET, taskSet[i].period);
     }
-    cout << SystemTask(taskSet).U() * 100 << "%" << endl;
     createJobs();
 }
 
@@ -74,7 +80,7 @@ SystemTask::SystemTask(char *pathFile)
     if (file.is_open()) {
         while (file >> O >> T >> D >> C) {
             Task t(O, T, D, C, cpt++);
-            addtask(t);
+            addTask(t);
         }
 
     } else
@@ -89,7 +95,7 @@ std::vector<Task> &SystemTask::getTaskSet()
     return taskSet;
 }
 
-int SystemTask::GCD(int a, int b)
+long SystemTask::GCD(long a, long b)
 {
     while(true)
     {
@@ -100,9 +106,14 @@ int SystemTask::GCD(int a, int b)
     }
 }
 
-int SystemTask::LCM(int a, int b)
+long SystemTask::LCM(long a, long b)
 {
     return abs(a * b) / GCD(a, b);
+}
+
+SystemTask::SystemTask()
+{
+
 }
 
 int SystemTask::random(int min, int max)
@@ -121,15 +132,14 @@ void SystemTask::createJobs()
     for(unsigned int i = 0; i < taskSet.size(); i++) {
         nbJobs = (int) ((maxInterval - taskSet[i].offset) / taskSet[i].period);
         for(int j = 0; j < nbJobs; j++) {
-            Job job {
+            taskSet[i].addJob({
                 taskSet[i].offset + j*taskSet[i].period,
                 taskSet[i].WCET,
                 taskSet[i].deadline,
                 taskSet[i].offset + j*taskSet[i].period + taskSet[i].deadline,
                 taskSet[i].WCET,
-                &taskSet[i]
-            };
-            taskSet[i].addJob(job);
+                taskSet[i].num
+            });
         }
     }
 }
@@ -170,7 +180,7 @@ int SystemTask::Omin()
     return Omax;
 }
 
-int SystemTask::P()
+long SystemTask::P()
 {
     if(taskSet.empty())
         throw std::length_error("error : no taks in the set");
@@ -187,7 +197,7 @@ Interval SystemTask::feasibleInterval()
     return {Omax(), Omax() + 2*P()};
 }
 
-void SystemTask::addtask(Task &t)
+void SystemTask::addTask(Task &t)
 {
     this->taskSet.push_back(t);
 }
@@ -197,6 +207,14 @@ void SystemTask::assignPriority()
     std::sort(taskSet.begin(), taskSet.end(), [](Task a, Task b)
     {
         return a.deadline < b.deadline;
+    });
+}
+
+void SystemTask::sortByUtilization()
+{
+    std::sort(taskSet.begin(), taskSet.end(), [](Task a, Task b)
+    {
+        return a.U() > b.U();
     });
 }
 

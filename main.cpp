@@ -4,7 +4,6 @@
 #include <fstream>
 #include "systemtask.h"
 #include "scheduler.h"
-
 using namespace std;
 
 // ========================== Functions declaration ========================= //
@@ -76,6 +75,7 @@ int strToInt(char *c) {
 
 
 int taskGenerator(int argc, char *argv[]) {
+    cout << "Here ????" << endl;
     int U, nbTasks;
     char *outputFile;
 
@@ -136,17 +136,22 @@ int simDM(int argc, char *argv[]) {
     // Priority assignment
     to.assignPriority();
     ScheduleInfos log, logRequired;
+    vector<ScheduleInfos> logsPartitionned;
     Scheduler *scheduler = new Scheduler(to, nbProcessors);
 
     if(partitionned)  {
-        log = scheduler->schedulePartitionned();
+        try {
+            logsPartitionned = scheduler->schedulePartitionned();
+        } catch(string e) {
+            cerr << e << endl;
+        }
 
         // TODO :
 
 
 
     } else {
-        // 1. schedule global with desired parameters
+        // 1. schedule global with desired parameters.
         // 2. schedule global from U to nbtask and stop as soon as it succeeds
         // 3. As soon as it succeeds, that schedule contains the
         //    required number of processors.
@@ -155,10 +160,12 @@ int simDM(int argc, char *argv[]) {
         //   (of the first scheduling at step 1 if it has succeeded.
         //   Otherwise, print the log of the scheduling that succeed at step 2.)
         log = scheduler->scheduleGlobal();
+
         logRequired.failed = true;
         if(log.failed) {
+
             cout << "The system has failed with "
-                 << nbProcessors << " processors. Retrying with more..."
+                 << nbProcessors << " processor(s). Retrying with more..."
                  << endl;
         }
 
@@ -166,9 +173,11 @@ int simDM(int argc, char *argv[]) {
             i <= to.getTaskSet().size() && logRequired.failed;
             i++)
         {
+            to.createJobs();
             scheduler = new Scheduler(to, i);
             logRequired = scheduler->scheduleGlobal();
         }
+
         if(logRequired.failed) {
             cout << "The system cannot be scheduling using global"
                  << " asignment and DM scheduling."
@@ -185,7 +194,9 @@ int simDM(int argc, char *argv[]) {
     }
 
     if(image)
-        scheduler->exportToBMP("graph.bmp");
+        scheduler->exportToBMP();
+
+    cout << scheduler->toString() << endl;
 
     return 0;
 }
@@ -212,21 +223,13 @@ int studyDM(int argc, char *argv[]) {
 
 int main(int argc, char *argv[])
 {
-    // Tests
-    char *args[] = {"taskGenerator", "-n", "7", "-u", "700", "-o", "out.txt"};
-    taskGenerator(7, args);
-    system("cat out.txt");
-    char *args2[] = {"simDM", "-g","out.txt", "3", "-i" };
-    simDM(5, args2);
-
-
-    #if defined TASK_GENERATOR_MODULE
-        return taskGenerator(argc, argv);
-    #elif defined SIM_DM_MODULE
-        return simDM(argc, argv);
-    #elif defined STUDY_DM_MODULE
-        return studyDM(argc, argv);
-    #endif
+#if defined(TASK_GENERATOR_MODULE)
+    return taskGenerator(argc, argv);
+#elif defined(SIM_DM_MODULE)
+    return simDM(argc, argv);
+#elif defined(STUDY_DM_MODULE)
+    return studyDM(argc, argv);
+#endif
     return -1;
 }
 // -------------------------------------------------------------------------- //

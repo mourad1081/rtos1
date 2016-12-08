@@ -14,9 +14,14 @@ Task::Task(int O, int T, int D, int C, int num)
 }
 
 
-void Task::addJob(Job &j)
+void Task::addJob(Job j)
 {
     this->jobs.push(j);
+}
+
+double Task::U()
+{
+    return (double) WCET / (double) period;
 }
 
 Job &Task::releaseJob()

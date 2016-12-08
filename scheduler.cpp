@@ -1,5 +1,5 @@
 #include "scheduler.h"
-#define IDLE nullptr
+#define IDLE -1
 
 using namespace std;
 
@@ -15,10 +15,6 @@ Scheduler::Scheduler(SystemTask &to, int nbProcessors) : taskSystem(to)
 
 ScheduleInfos Scheduler::scheduleGlobal()
 {
-    Job *highestPriorityJob, *previousJob;
-    // Clear the previous scheduling
-    assignments.clear();
-
     // First variable : Informations about this schedule
     ScheduleInfos scheduleInfos;
     for(int i = 0; i < nbProcessors; i++) {
@@ -26,7 +22,9 @@ ScheduleInfos Scheduler::scheduleGlobal()
         scheduleInfos.nbPreemptionsPerProcessor[i] = 0;
         scheduleInfos.utilisationPerProcessor[i] = 0.0;
     }
-    scheduleInfos.studyInterval = {0, taskSystem.feasibleInterval().max};
+    scheduleInfos.nbIdleTotal = 0;
+    scheduleInfos.nbPreemptionsTotal = 0;
+    scheduleInfos.studyInterval = {0, max};
     scheduleInfos.nbDesiredProcessors = nbProcessors;
     scheduleInfos.nbRequiredProcessors = -1;
     scheduleInfos.failed = false;
@@ -41,75 +39,52 @@ ScheduleInfos Scheduler::scheduleGlobal()
                                         "that number of processors. "
                                         "Perhaps retry with more.";
     }
-    // Lambda that represents how jobs must be compared
-    auto comparator = [](Job * left, Job *right) -> bool {
-        return left->absolute_deadline > right->absolute_deadline;
-    };
 
-    // Represents all pending jobs.
-    std::priority_queue<Job *, std::vector<Job *>,
-                        decltype(comparator)> jobs_to_execute(comparator);
-    
-    // For each slot of time and while the scheduling hasn't failed
-    for(int t = 0;
-        t < taskSystem.feasibleInterval().max && !scheduleInfos.failed;
-        t++)
-    {
-        // All tasks that must release a job do it.
-        // (release time of the next job of a task >= i)
-        for(Task &task : taskSystem.getTaskSet())
-            if (task.hasNextJob() && task.nextJob().release == t)
-                jobs_to_execute.push(&task.releaseJob());
+    std::vector<Task> &to = taskSystem.getTaskSet();
+    for(unsigned int i = 0; i < to.size(); i++) {
+        while(to[i].hasNextJob() && !scheduleInfos.failed) {
+            Job job = to[i].releaseJob();
 
-        // And then, for each processors and while the scheduling hasn't failed
-        for(int P = 0; P < nbProcessors && !scheduleInfos.failed; P++) {
-            // Is there any job to execute ?
-            if(! jobs_to_execute.empty()) {
-                highestPriorityJob = jobs_to_execute.top();
-                assign(P, t, highestPriorityJob);
-                jobs_to_execute.pop();
-                // Deadline will miss ?
-                scheduleInfos.failed = highestPriorityJob->absolute_deadline
-                           < (t + highestPriorityJob->remeaningComputation);
-                if(scheduleInfos.failed) {
-                    scheduleInfos.optionalMessage = "Deadline miss ! "
-                                                    "Scheduling has stopped.";
+            long slotFrom = job.release, freeSlot;
+            int freeProcessor, previousNumTaskOfJob;
+            while(job.remeaningComputation > 0 && !scheduleInfos.failed) {
+                // On cherche un slot libre
+                findFreeSlot(slotFrom, &freeSlot, &freeProcessor);
+                // On assigne le job à ce slot
+                assign(freeProcessor, freeSlot, job.numTaskParent);
+                // Une deadline miss occure-t-elle ?
+                if(job.remeaningComputation + freeSlot > job.absolute_deadline)
+                    scheduleInfos.failed = true;
+                else {
+                    // On compute
+                    job.remeaningComputation--;
+                    // On met à jour d'où on recherche
+                    slotFrom = freeSlot + 1;
+                    // Preemption ?
+                    previousNumTaskOfJob = jobAt(freeSlot-1, freeProcessor);
+                    if((freeSlot > 0)
+                         && (previousNumTaskOfJob != IDLE)
+                         && (previousNumTaskOfJob != job.numTaskParent))
+                    {
+                        scheduleInfos.nbPreemptionsPerProcessor[freeProcessor]++;
+                        scheduleInfos.nbPreemptionsTotal++;
+                    }
                 }
-                // Use Processor
-                highestPriorityJob->remeaningComputation--;
-                // A preemption occured ?
-                previousJob = jobAt(t-1, P);
-                if((t > 0) && (previousJob != IDLE)
-                           && (previousJob != jobAt(t, P)))
-                {
-                    scheduleInfos.nbPreemptionsPerProcessor[P]++;
-                    scheduleInfos.nbPreemptionsTotal++;
-                }
-            } else {
-                // There is no job to execute.
-                scheduleInfos.nbIdlePerProcessor[P]++;
-                scheduleInfos.nbIdleTotal++;
             }
         }
-
-        // All not finished jobs at time t returns to the execution queue
-        for(int P = 0; P < nbProcessors; P++) {
-            Job *j = jobAt(t, P);
-            if(j != IDLE && j->remeaningComputation > 0)
-                jobs_to_execute.push(j);
-        }
     }
 
-
-    // Computation of utilisations...
+    // Computation of idles & utilisations...
     for(int P = 0; P < nbProcessors; P++) {
+        scheduleInfos.nbIdlePerProcessor[P] = max - countAssignments(P);
         scheduleInfos.utilisationPerProcessor[P] =
-             (double) (scheduleInfos.studyInterval.max - scheduleInfos.nbIdlePerProcessor[P])
-           / (double) (scheduleInfos.studyInterval.max);
+             (double) (max - scheduleInfos.nbIdlePerProcessor[P])
+           / (double) (max);
     }
+    scheduleInfos.nbIdleTotal = max*nbProcessors - assignments.size();
     scheduleInfos.utilisationTotal =
-             (double) (scheduleInfos.studyInterval.max*nbProcessors - scheduleInfos.nbIdleTotal)
-           / (double) (scheduleInfos.studyInterval.max*nbProcessors);
+             (double) (max*nbProcessors - scheduleInfos.nbIdleTotal)
+           / (double) (max*nbProcessors);
 
     return scheduleInfos;
 }
@@ -154,20 +129,26 @@ void Scheduler::printInfos(ScheduleInfos &infos)
 
 }
 
-void Scheduler::addProcessor()
+string Scheduler::toString()
 {
-    nbProcessors++;
+    std::ostringstream res;
+    for(Assignment &a : assignments) {
+        res << "@ slot " << a.slotTime
+            << " on CPU " << a.numProcessor
+            << ", job ID = "
+            << a.numTaskOfJob
+            << endl;
+    }
+    return res.str();
 }
 
-void Scheduler::removeProcessor()
-{
-    nbProcessors--;
-}
 
-
-ScheduleInfos Scheduler::schedulePartitionned()
+vector<ScheduleInfos> Scheduler::schedulePartitionned()
 {
-    return {};
+    vector<ScheduleInfos> infos;
+    for(SystemTask &to : this->bestFit())
+        infos.push_back( Scheduler(to, 1).scheduleGlobal() );
+    return infos;
 }
 
 void Scheduler::exportToBMP(string pathFile)
@@ -179,7 +160,8 @@ void Scheduler::exportToBMP(string pathFile)
     int cptProcessor =  1;
     std::string indexProcessor;
     BMP image;
-    std::map<Task *, RGBApixel> taskColors;
+    // map <ID task, Color>
+    std::map<int, RGBApixel> taskColors;
     image.SetSize(w, h);
 
     // Time axis
@@ -203,18 +185,22 @@ void Scheduler::exportToBMP(string pathFile)
         {
             image.SetPixel(i, j, {210, 210, 210, 0});
         }
-        if((cptDashes % (taskSystem.feasibleInterval().max/taskSystem.getTaskSet().size()) == 0) || (i == (padding + lengthTimeAxis-1)))
+        if((cptDashes % (taskSystem.feasibleInterval().max
+                         /taskSystem.getTaskSet().size()) == 0)
+                || (i == (padding + lengthTimeAxis-1)))
+        {
             PrintString(image, const_cast<char*>(std::to_string(cptDashes).c_str()),
                         i, lengthProcessorAxis + padding + (int)(padding*0.25),
                         8, {0,0,0,0} /* = {Blue, Green, Red, Alpha} */ );
+        }
         cptDashes++;
     }
 
     // Assignments
-    for(unsigned int i = 0; i < assignments.size(); i++) {
+    for(Assignment &a : assignments) {
         // Assign a random color to the task if it hasn't one yet.
-        if(taskColors.find(assignments[i].assignedJob->parent) == taskColors.end()) {
-            taskColors[assignments[i].assignedJob->parent] = {
+        if(taskColors.find(a.numTaskOfJob) == taskColors.end()) {
+            taskColors[a.numTaskOfJob] = {
                 (ebmpBYTE) taskSystem.random(1, 256),
                 (ebmpBYTE) taskSystem.random(1, 256),
                 (ebmpBYTE) taskSystem.random(1, 256),
@@ -222,8 +208,8 @@ void Scheduler::exportToBMP(string pathFile)
             };
         }
         int fromX, fromY, toX, toY;
-        fromX = padding + (lengthTimeAxis/taskSystem.feasibleInterval().max)*assignments[i].slotTime;
-        fromY = padding + (lengthProcessorAxis/nbProcessors)*assignments[i].numProcessor;
+        fromX = padding + (lengthTimeAxis/taskSystem.feasibleInterval().max)*a.slotTime;
+        fromY = padding + (lengthProcessorAxis/nbProcessors)*a.numProcessor;
         toX   = fromX + (lengthTimeAxis/taskSystem.feasibleInterval().max);
         toY   = fromY + (lengthProcessorAxis/nbProcessors)/2;
 
@@ -231,9 +217,9 @@ void Scheduler::exportToBMP(string pathFile)
         for (int x = fromX; x < toX; x++){
             for (int y = fromY; y < toY; y++) {
                 image.SetPixel(x, y, {
-                    taskColors[assignments[i].assignedJob->parent].Blue,
-                    taskColors[assignments[i].assignedJob->parent].Green,
-                    taskColors[assignments[i].assignedJob->parent].Red,
+                    taskColors[a.numTaskOfJob].Blue,
+                    taskColors[a.numTaskOfJob].Green,
+                    taskColors[a.numTaskOfJob].Red,
                     0
                 });
             }
@@ -266,25 +252,85 @@ void Scheduler::exportToBMP(string pathFile)
         }
     }
 
-    image.WriteToFile("out.bmp");
+    image.WriteToFile(pathFile.c_str());
 }
 
-Job *Scheduler::jobAt(int slot, int numProcessor)
+long Scheduler::countAssignments(int P)
 {
-    auto it = std::find_if(assignments.begin(),
-                           assignments.end(),
-                           // [=] to indicate that I would like all local
-                           // variables to be captured by value in a lambda
-                           [=](Assignment &a) {
-                                return a.numProcessor == numProcessor
-                                    && a.slotTime == slot;
-                           });
-
-    return it != assignments.end() ? (*it).assignedJob : IDLE;
+    return std::count_if(assignments.begin(), assignments.end(),
+           [=](Assignment &elt) {
+                return elt.numProcessor == P;
+    });
 }
 
-void Scheduler::assign(int numProcessor, int slot, Job *job)
+void Scheduler::findFreeSlot(long from, long *freeSlot, int *freeProcessor)
 {
-    assignments.push_back({ job, numProcessor, slot });
+    for(int i = from; from < max; i++) {
+        for(int P = 0; P < nbProcessors; P++) {
+            if(jobAt(from, P) == IDLE) {
+                *freeSlot = from;
+                *freeProcessor = P;
+                return;
+            }
+        }
+        from++;
+    }
+    *freeSlot = -1;
+    *freeProcessor = -1;
 }
 
+std::vector<SystemTask> Scheduler::bestFit()
+{
+    vector<SystemTask> listPartitions;
+    taskSystem.sortByUtilization();
+    for(Task &t : taskSystem.getTaskSet()) {
+        fit(t, listPartitions);
+        if(listPartitions.size() > nbProcessors)
+            throw std::string("error. More bins than CPU's");
+    }
+    return listPartitions;
+}
+
+void Scheduler::fit(Task &t, std::vector<SystemTask> &listPartitions)
+{
+    SystemTask newPartition;
+    int indexBest = -1, currentFit, bestFit;
+    if(!listPartitions.empty()) {
+        indexBest = 0;
+        bestFit = t.U() + listPartitions[0].U();
+    }
+    for(int i = 0; i < listPartitions.size(); i++) {
+        currentFit = t.U() + listPartitions[i].U();
+        if( (currentFit < 1) && (currentFit < bestFit) ) {
+            indexBest = i;
+            bestFit = currentFit;
+        }
+    }
+
+    if(indexBest == -1) {
+        newPartition.addTask(t);
+        listPartitions.push_back(newPartition);
+    } else
+        listPartitions[indexBest].addTask(t);
+}
+
+int Scheduler::jobAt(long slot, int numProcessor)
+{
+    std::vector<Assignment>::iterator it = std::find_if(
+        assignments.begin(),
+        assignments.end(),
+        // [=] to indicate that I would like all local
+        // variables to be captured by value in a lambda
+        [=](Assignment &a) {
+            return a.numProcessor == numProcessor
+            && a.slotTime == slot;
+        }
+    );
+
+    return it != assignments.end() ? (*it).numTaskOfJob : IDLE;
+}
+
+void Scheduler::assign(int numProcessor, long slot, int numTaskOfJob)
+{
+    assignments.push_back({ numTaskOfJob, numProcessor, slot });
+}
