@@ -1,4 +1,0 @@
-#!/bin/bash
-g++ -std=c++11 -Wall -DTASK_GENERATOR_MODUL easyBMP/*.cpp *.cpp  -o taskGenerator
-g++ -std=c++11 -Wall -DSTUDY_DM_MODULE      easyBMP/*.cpp *.cpp  -o studyDM
-g++ -std=c++11 -Wall -DSIM_DM_MODULE        easyBMP/*.cpp *.cpp	 -o simDM
