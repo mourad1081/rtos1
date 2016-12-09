@@ -42,6 +42,11 @@ class Task {
     Job &releaseJob();
 
     /*!
+     * \brief Release all jobs
+     */
+    void clearJobs();
+
+    /*!
      * \brief Returns the latest job in the queue without releasing (poping) it.
      * \return The last job in the queue.
      */

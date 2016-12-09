@@ -50,6 +50,7 @@ private:
 public:
 
     SystemTask();
+
     /*!
      * \brief Copy constructor
      * \param toCopy

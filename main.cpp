@@ -110,12 +110,12 @@ int taskGenerator(int argc, char *argv[]) {
 // ============================= SIM DM MODULE ============================== //
 
 int simDM(int argc, char *argv[]) {
+
     bool partitionned = false;
     bool global       = false;
     bool image        = false;
     char *pathFile;
     int nbProcessors;
-
     // Parsing arguments
     if(argc < 4)
         throw std::invalid_argument(ERROR_SIM_DM);
@@ -124,32 +124,32 @@ int simDM(int argc, char *argv[]) {
         partitionned = !strcmp(argv[1], "-p");
         pathFile     = argv[2];
         nbProcessors = strToInt(argv[3]);
-        image        = !strcmp(argv[4], "-i");
+        if(argc > 4)
+            image    = !strcmp(argv[4], "-i");
         if(partitionned == global)
             throw std::invalid_argument(ERROR_SIM_DM);
 
     }
-
     // Creation of the system tasks
     SystemTask to(pathFile);
 
     // Priority assignment
-    to.assignPriority();
     ScheduleInfos log, logRequired;
-    vector<ScheduleInfos> logsPartitionned;
+    vector<ScheduleInfos> *logsPartitionned;
     Scheduler *scheduler = new Scheduler(to, nbProcessors);
-
-    if(partitionned)  {
+    if(partitionned) {
         try {
             logsPartitionned = scheduler->schedulePartitionned();
+            cout << Colors::cyan << "Number of partitions : " << logsPartitionned->size() << Colors::reset << endl;
+            for(int i = 0; i < logsPartitionned->size(); i++) {
+                cout << Colors::cyan << "PARTITION " << i << Colors::reset << endl;
+                logsPartitionned->at(i).nbRequiredProcessors = 1;
+                Scheduler::printInfos(logsPartitionned->at(i));
+                cout << endl << endl;
+            }
         } catch(string e) {
             cerr << e << endl;
         }
-
-        // TODO :
-
-
-
     } else {
         // 1. schedule global with desired parameters.
         // 2. schedule global from U to nbtask and stop as soon as it succeeds
@@ -160,22 +160,24 @@ int simDM(int argc, char *argv[]) {
         //   (of the first scheduling at step 1 if it has succeeded.
         //   Otherwise, print the log of the scheduling that succeed at step 2.)
         log = scheduler->scheduleGlobal();
-
+        int i = std::ceil(to.U());
         logRequired.failed = true;
         if(log.failed) {
-
             cout << "The system has failed with "
                  << nbProcessors << " processor(s). Retrying with more..."
                  << endl;
         }
 
-        for(int i = std::ceil(to.U());
-            i <= to.getTaskSet().size() && logRequired.failed;
-            i++)
+        while(logRequired.failed && i <= to.getTaskSet().size())
         {
             to.createJobs();
             scheduler = new Scheduler(to, i);
             logRequired = scheduler->scheduleGlobal();
+            if(logRequired.failed) {
+                cout << "G FAIL AVEC " << i << " CPUUU" << endl;
+                cout << logRequired.optionalMessage << endl;
+            }
+            i++;
         }
 
         if(logRequired.failed) {
@@ -191,13 +193,10 @@ int simDM(int argc, char *argv[]) {
             log.failed ? Scheduler::printInfos(logRequired)
                        : Scheduler::printInfos(log);
         }
+
     }
-
     if(image)
-        scheduler->exportToBMP();
-
-    cout << scheduler->toString() << endl;
-
+        scheduler->exportToBMP("global.bmp");
     return 0;
 }
 
@@ -223,13 +222,13 @@ int studyDM(int argc, char *argv[]) {
 
 int main(int argc, char *argv[])
 {
-#if defined(TASK_GENERATOR_MODULE)
-    return taskGenerator(argc, argv);
-#elif defined(SIM_DM_MODULE)
-    return simDM(argc, argv);
-#elif defined(STUDY_DM_MODULE)
-    return studyDM(argc, argv);
-#endif
+    #if defined(TASK_GENERATOR_MODULE)
+        return taskGenerator(argc, argv);
+    #elif defined(SIM_DM_MODULE)
+        return simDM(argc, argv);
+    #elif defined(STUDY_DM_MODULE)
+        return studyDM(argc, argv);
+    #endif
     return -1;
 }
 // -------------------------------------------------------------------------- //

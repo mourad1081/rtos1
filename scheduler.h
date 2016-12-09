@@ -1,10 +1,14 @@
 #ifndef TIMELINE_H
 #define TIMELINE_H
+
 #include <map>
 #include <tuple>
+#include <string>
+#include <iomanip>
 #include <sstream>
 #include "systemtask.h"
 #include "easyBMP/EasyBMP.h"
+#include "easyBMP/EasyBMP_Font.h"
 
 /*!
  * \brief The ScheduleInfos struct is used to store all stats after a scheduling
@@ -22,6 +26,7 @@ struct ScheduleInfos {
     Interval studyInterval;
     bool failed;
     std::string optionalMessage;
+    int nbTasks;
 };
 
 struct Assignment {
@@ -29,6 +34,16 @@ struct Assignment {
     int numProcessor;
     long slotTime;
 };
+
+// Just defining some colors
+namespace Colors {
+    static const std::string red     = "\033[0;31m";
+    static const std::string green   = "\033[1;32m";
+    static const std::string yellow  = "\033[1;33m";
+    static const std::string cyan    = "\033[0;36m";
+    static const std::string magenta = "\033[0;35m";
+    static const std::string reset   = "\033[0m";
+}
 
 class Scheduler
 {
@@ -93,7 +108,7 @@ class Scheduler
          * \brief schedulePartitionned
          * \return
          */
-        std::vector<ScheduleInfos> schedulePartitionned();
+        std::vector<ScheduleInfos> *schedulePartitionned();
 
         /*!
          * \brief exportToBMP
@@ -123,7 +138,7 @@ class Scheduler
          *        of the bin packing problem.
          * \return
          */
-        std::vector<SystemTask> bestFit();
+        std::vector<SystemTask> *bestFit();
 
         /*!
          * \brief Put the task t in a task system regarding
@@ -131,7 +146,7 @@ class Scheduler
          * \param t The task to add in a task system.
          * \param listPartitions The list of task system.
          */
-        void fit(Task &t, std::vector<SystemTask> &listPartitions);
+        void fit(Task &t, std::vector<SystemTask> *listPartitions);
 
         /*!
          * \brief printInfos
